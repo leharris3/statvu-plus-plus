@@ -1,4 +1,4 @@
 # statvu-plus-plus
 ---
 
-- *Doucmentation comming soon.*
+- *Documentation comming soon.*
