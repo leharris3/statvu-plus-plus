@@ -1,7 +1,7 @@
 # statvu-plus-plus
 ---
 - **How to add Games to this Database**:
-	1. Clone this repo and install all dependencies by running `install_dependencies.py`
+	1. Clone this repo and install all dependencies by running `install_dependencies.py` (Coming Soon)
 	2. Add a `.mp4` file to the folder labeled `unprocessed-videos`
 	3. Title the video using the following formatting: `MM.DD.YYYY.HOM.at.AWY.NET` where:
 		 - MM.DD.YYYY is the month/day/year a game was played on
@@ -10,7 +10,11 @@
 			- ESPN: **ESP**
 			- TNT: **TNT**
 			- FOX: **FOX**
-			- ...
+			- CSN: **CSN**
+			- TSN: **TSN**
 		- Example: the Los Angeles Lakers played the Golden State Warriors on 01/14/16 on TNT:
 			- **01.14.2016.LAL.at.GSW.TNT**
 	4. Once all videos you wish to add are formatted and placed in `unprocessed-videos` run the `main.py` script
+
+**IMPORTANT!**:
+ - Populate the statvu-data folder with the data from [this](https://github.com/linouk23/NBA-Player-Movements) repo.
