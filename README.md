@@ -16,5 +16,5 @@
 			- **01.14.2016.LAL.at.GSW.TNT**
 	4. Once all videos you wish to add are formatted and placed in `unprocessed-videos` run the `main.py` script
 
-**IMPORTANT!**:
+**IMPORTANT**:
  - Populate the statvu-data folder with the data from [this](https://github.com/linouk23/NBA-Player-Movements) repo.
