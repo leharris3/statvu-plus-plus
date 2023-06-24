@@ -1,43 +1,33 @@
-# 1. Normalize all videos
-# 2. Temporal grounding + verification for all videos
-# 3. Append new data to statvu position data
-# 4. Visualize and verify
-
 import os
 import moviepy.editor as mp
+import subprocess
+
+NORMAL_WIDTH = 1280
+NORMAL_HEIGHT = 720
+NORMAL_FPS = 25
 
 
 def normalize_video(file_path):
     try:
-        # Set the target resolution and frame rate
-        target_resolution = (1280, 720)
-        target_fps = 25
-
-        with mp.VideoFileClip(file_path) as video:
-            # Resize the video to the target resolution
-            resized_video = video.resize(
-                height=target_resolution[1], width=target_resolution[0])
-
-            # Set the frame rate to the target frame rate
-            final_video = resized_video.set_fps(target_fps)
-
-            # Generate a temporary file path for the final video
-            temp_file_path = file_path + "_mod.mp4"
-
-            # Write the final video to the temporary file path
-            final_video.write_videofile(
-                temp_file_path, codec="libx264", audio_codec="aac", fps=target_fps)
-
-        # Close the original video file
-        video.reader.close()
-
-        # Delete the original file
+        directory = os.path.dirname(file_path)
+        file_name = os.path.splitext(os.path.basename(file_path))[0]
+        output_file = os.path.join(directory, f"{file_name}_converted.mp4")
+        command = [
+            "ffmpeg",
+            "-i", file_path,
+            "-vf", "scale=1280:720",
+            "-r", "25",
+            "-c:v", "libx264",
+            "-crf", "23",
+            "-preset", "medium",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            output_file
+        ]
+        subprocess.run(command)
         os.remove(file_path)
-
-        # Rename the temporary file to the original file path
-        os.rename(temp_file_path, file_path)
-
-        print("Video conversion successful.")
+        os.rename(output_file, file_path)
     except Exception as e:
         print(f"Video conversion failed: {str(e)}")
 
