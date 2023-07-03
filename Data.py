@@ -14,6 +14,8 @@ class Data:
         self.path_to_processed_data_zipped = f"statvu-plus-plus/{title}.{network}/{title}.{network}.7z"
         self.path_to_processed_data_unzipped = f"statvu-plus-plus/{title}.{network}/{title}.{network}.json"
         self.path_to_timestamps = f"statvu-plus-plus/{title}.{network}/timestamps.json"
+        self.abs_path_to_processed_data_unzipped = os.path.abspath(
+            self.path_to_processed_data_unzipped)
 
     def post_process(self) -> bool:
         json_path = self.path_to_timestamps
@@ -57,7 +59,6 @@ class Data:
 
     def smooth_results(self, data):
         time_values = [entry[1] for entry in data.values()]
-        # Calculate the mean and standard deviation of time values
         mean_value = statistics.mean(time_values)
         std_dev = statistics.stdev(time_values)
         # Filter out entries with time values deviating significantly from the mean

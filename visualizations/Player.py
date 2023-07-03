@@ -1,4 +1,4 @@
-from Team import Team
+from visualizations.Team import Team
 
 
 class Player:

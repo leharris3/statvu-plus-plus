@@ -1,6 +1,6 @@
-from Constant import Constant
-from Moment import Moment
-from Team import Team
+from visualizations.Constant import Constant
+from visualizations.Moment import Moment
+from visualizations.Team import Team
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.patches import Circle, Rectangle, Arc
@@ -10,12 +10,14 @@ import imageio
 from moviepy.editor import *
 import os
 import subprocess
+from pathlib import Path
+import moviepy
 
 
 class Event:
     """A class for handling and showing events"""
 
-    def __init__(self, event, video_path):
+    def __init__(self, event, video_path, event_index, game_title):
         moments = event['moments']
         self.moments = [Moment(moment) for moment in moments]
         home_players = event['home']['players']
@@ -23,48 +25,26 @@ class Event:
         players = home_players + guest_players
         player_ids = [player['playerid'] for player in players]
         player_names = [" ".join([player['firstname'],
-                        player['lastname']]) for player in players]
+                                  player['lastname']]) for player in players]
         player_jerseys = [player['jersey'] for player in players]
         values = list(zip(player_names, player_jerseys))
         # Example: 101108: ['Chris Paul', '3']
         self.player_ids_dict = dict(zip(player_ids, values))
+
         self.video_path = video_path
+        self.event_index = event_index
+        self.game_title = game_title
 
     def combine_videos_side_by_side(self, video1_path, video2_path, output_path):
-        # Load the video clips
+        output_path = f"visualizations/examples/{self.game_title}.{self.event_index}.mp4"
         video1 = VideoFileClip(video1_path)
         video2 = VideoFileClip(video2_path)
+        video2 = video2.resize(height=720)
+        combined_video = clips_array([[video1, video2]])
+        combined_video.write_videofile(
+            output_path, codec="libx264", fps=25)
 
-        # Synchronize the videos by aligning the start times
-        start_time = max(video1.start, video2.start)
-        video1 = video1.set_start(start_time)
-        video2 = video2.set_start(start_time)
-
-        # Determine the height and width of the output video
-        height = max(video1.h, video2.h)
-        width = max(video1.w, video2.w)
-
-        # Resize the videos to match the height of the output video
-        # video1 = video1.resize(height=height, width=width)
-        video2 = video2.resize(width=640)
-
-        # Set the duration of the output video
-        duration = max(video1.duration, video2.duration)
-        video1 = video1.set_duration(duration)
-        video2 = video2.set_duration(duration)
-
-        # Combine the videos side by side
-        combined_video = CompositeVideoClip(
-            [video1, video2], size=(width, height))
-
-        # Set the output video parameters
-        combined_video = combined_video.set_audio(None)  # Remove audio
-        combined_video = combined_video.resize(width=1280)
-
-        # Save the combined video
-        combined_video.write_videofile(output_path, codec="libx264", fps=30)
-
-    def save_frames_as_video(self, frames, output_path, fps=15):
+    def save_frames_as_video(self, frames, output_path, fps=25):
         height, width, _ = frames[0].shape
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -76,18 +56,22 @@ class Event:
     def display_frame_from_video(self, frame_number):
         video = cv2.VideoCapture(self.video_path)
         if not video.isOpened():
+            print(f"Video at {self.video_path} could not be opened.")
             return
         frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
         if int(frame_number) >= frame_count:
+            print(f"Frame {frame_number} out of range.")
             return
         video.set(cv2.CAP_PROP_POS_FRAMES, int(frame_number))
         ret, frame = video.read()
         if not ret:
+            print(f"Null ret for frame {frame_number}.")
             return
         # cv2.imshow("Frame", frame)
         return frame
 
     def update_radius(self, i, player_circles, ball_circle, annotations, clock_info, video_frames):
+        # print(f"Updating radius of {i}.")
         moment = self.moments[i]
 
         # Display corrosponding frame number.
@@ -97,6 +81,8 @@ class Event:
                 frame_number=frame_number))
 
         for j, circle in enumerate(player_circles):
+            if not moment.shot_clock:
+                moment.shot_clock = 0.0
             circle.center = moment.players[j].x, moment.players[j].y
             annotations[j].set_position(circle.center)
             clock_test = 'Quarter {:d}\n {:02d}:{:02d}\n {:03.1f}'.format(
@@ -107,6 +93,8 @@ class Event:
             clock_info.set_text(clock_test)
             ball_circle.center = moment.ball.x, moment.ball.y
             ball_circle.radius = moment.ball.radius / Constant.NORMALIZATION_COEF
+
+        # print("Update radius finished for {i}.")
         return player_circles, ball_circle
 
     def show(self):
@@ -176,14 +164,16 @@ class Event:
                    annotations, clock_info, video_frames),
             frames=len(self.moments), interval=Constant.INTERVAL,
             repeat=False)
-        court = plt.imread("court.png")
+        court = plt.imread("visualizations\court.png")
         plt.imshow(court, zorder=0, extent=[Constant.X_MIN, Constant.X_MAX - Constant.DIFF,
                                             Constant.Y_MAX, Constant.Y_MIN])
-        anim.save("anim.mp4", fps=15)
+
+        anim.save(filename="anim.mp4", fps=25)
         plt.close()
+
         self.save_frames_as_video(
             frames=video_frames, output_path="frames.mp4")
         self.combine_videos_side_by_side(
-            video1_path="frames.mp4", video2_path="anim.mp4", output_path="viz.mp4")
+            video1_path="frames.mp4", video2_path="anim.mp4", output_path=f"visualizations/viz.mp4")
         os.remove(path="anim.mp4")
         os.remove("frames.mp4")

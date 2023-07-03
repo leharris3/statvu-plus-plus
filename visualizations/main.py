@@ -1,4 +1,4 @@
-from Game import Game
+from visualizations.GameViz import GameViz
 import argparse
 
 parser = argparse.ArgumentParser(
@@ -13,6 +13,7 @@ parser.add_argument('--event', type=int, default=0,
                             one of the game)""")
 
 args = parser.parse_args()
-game = Game(path_to_json=args.path, event_index=args.event)
-game.read_json()
-game.start()
+
+#  game = GameViz(path_to_json=args.path, event_index=args.event)
+#  game.read_json()
+#  game.start()

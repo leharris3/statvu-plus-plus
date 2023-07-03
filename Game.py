@@ -1,6 +1,7 @@
 from scripts.extraction import *
 from Video import *
 from Data import *
+from visualizations.GameViz import *
 
 import os
 import shutil
@@ -10,6 +11,8 @@ from typing import Dict, Any, List, Union
 FRAME_WIDTH_OUT = 1280
 FRAME_HEIGHT_OUT = 720
 FPS_OUT = 25
+
+NO_MATCH = -1
 
 
 class Game:
@@ -24,25 +27,24 @@ class Game:
 
     def process(self):
         # 1. Move + create new folder
-        print(f"Creating game folder for game: {self.title}")
+        # print(f"Creating game folder for game: {self.title}")
         # self.createNewGameFolder()
 
         # 2. Normalize
-        print(f"Normalizing video for game: {self.title}")
+        # print(f"Normalizing video for game: {self.title}")
         # self.video.normalize()
 
         # 3. Extract Time
-        print(f"Extracting timestamps for game: {self.title}")
-        self.extract_time()
+        #  print(f"Extracting timestamps for game: {self.title}")
+        # self.extract_time()
 
         # 4. Post Process Extraction
-        print(f"Post-processing results for game: {self.title}.")
-        self.data.post_process()
+        # print(f"Post-processing results for game: {self.title}.")
+        # self.data.post_process()
 
         # 5. Visualize data-mapping. (For Now)
-        print("Generating visualization.")
-        self.visualize_timestamp_extraction()
-        exit()
+        # print("Generating visualization.")
+        # self.visualize_timestamp_extraction()
 
         # 6. Map Timestamps to Statvu File
         print("Mapping timestamps to statvu data.")
@@ -99,6 +101,16 @@ class Game:
         with open(f"{self.path_to_game_dir}/timestamps.json", 'w') as f:
             json.dump(timestamps, f)
         return True
+
+    def visualize_event(self, event_index: int):
+        try:
+            game = GameViz(
+                path_to_json=self.data.abs_path_to_processed_data_unzipped,
+                path_to_video=self.video.abs_path_to_processed_video,
+                game_title=self.title)
+            game.visualize_event(event_index=event_index)
+        except:
+           print(f"Unable to generate visualization for event {event_index}.")
 
     def visualize_timestamp_extraction(self):
 
@@ -160,41 +172,46 @@ class Game:
         print("Video processing complete!")
 
     def map_timestamps_to_statvu(self) -> bool:
-        timestamp_data_path: str = self.data.path_to_timestamps
-        timestamp_data_raw = open(timestamp_data_path)
-        statvu_data_path: str = self.data.path_to_processed_data_unzipped
-        statvu_data_raw = open(statvu_data_path)
-        statvu_data: Dict[str, Any] = json.load(statvu_data_raw)
-        timestamp_data: Dict[str, Union[int, List[Union[int, float]]]] = json.load(
-            timestamp_data_raw)
-        statvu_data["video_path"] = statvu_data_path.strip('.json') + '.mp4'
+        """Maps a frame parameter to every moment in orginal stavu data file."""
+
+        timestamps = {}
+        timestamp_data_raw = json.load(open(self.data.path_to_timestamps))
+        for frame in timestamp_data_raw:
+            temp_quarter = str(timestamp_data_raw[frame][0])
+            temp_time_remaining = str(timestamp_data_raw[frame][1])
+            key = f"{temp_quarter} {temp_time_remaining}"
+            timestamps[key] = frame
+
+        statvu_data: Dict[str, Any] = json.load(
+            open(self.data.path_to_processed_data_unzipped))
+        statvu_data["video_path"] = self.data.path_to_processed_data_unzipped.strip(
+            '.json') + '.mp4'
+
+        total, misses = 0, 0
         for event in statvu_data['events']:
             for moment in event['moments']:
+                if total == 0:
+                    print(moment)
+
                 quarter: str = str(moment[0])
                 time: int = moment[2]
-                key_exact: str = quarter + " " + str(time)
-                key_one = quarter + " " + str(time - .01)
-                key_two = quarter + " " + str(time - .02)
-                key_three = quarter + " " + str(time - .03)
-                key_four = quarter + " " + str(time + .01)
-                key_five = quarter + " " + str(time + .02)
-                key_six = quarter + " " + str(time + .03)
-                if key_exact in timestamp_data:
-                    moment.append(timestamp_data[key_exact])
-                elif key_one in timestamp_data:
-                    moment.append(timestamp_data[key_one])
-                elif key_two in timestamp_data:
-                    moment.append(timestamp_data[key_two])
-                elif key_three in timestamp_data:
-                    moment.append(timestamp_data[key_three])
-                elif key_four in timestamp_data:
-                    moment.append(timestamp_data[key_four])
-                elif key_five in timestamp_data:
-                    moment.append(timestamp_data[key_five])
-                elif key_six in timestamp_data:
-                    moment.append(timestamp_data[key_six])
-                else:
-                    moment.append(-1)
+
+                found = False
+                for offset in range(-3, 3):
+                    key = f"{quarter} {str(time + (offset / 100))}"
+                    if key in timestamps:
+                        moment.append(timestamps[key])
+                        found = True
+                        break
+                if not found:
+                    moment.append(NO_MATCH)  # no match
+                    misses += 1
+                total += 1
+
+                # Timestamp gets append to end of moment arr, not always going to be in a reliable pos.
+                # Maybe stavu data should use more dicts to solve this problem
+
+        print(f"found frames for {(total - misses)/ total}% of moments")
         out_path: str = f"{self.path_to_game_dir}/mapped.json"
         with open(out_path, 'w') as f:
             json.dump(statvu_data, f)

@@ -1,18 +1,18 @@
-from Ball import Ball
-from Player import Player
+from visualizations.Ball import Ball
+from visualizations.Player import Player
 
 
 class Moment:
     """A class for keeping info about the moments"""
 
     def __init__(self, moment):
-        self.quarter = moment[0]  # Hardcoded position for quarter in json
-        # Hardcoded position for game_clock in json
+        self.quarter = moment[0]
         self.game_clock = moment[2]
-        # Hardcoded position for shot_clock in json
         self.shot_clock = moment[3]
-        ball = moment[5][0]  # Hardcoded position for ball in json
-        self.ball = Ball(ball)
+
+        ball = moment[5][0]
         players = moment[5][1:]  # Hardcoded position for players in json
+
+        self.ball = Ball(ball)
         self.players = [Player(player) for player in players]
         self.frame_number = moment[6]
