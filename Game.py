@@ -1,18 +1,22 @@
 from scripts.extraction import *
+from scripts.mapping import *
+from scripts.object_detection import *
 from Video import *
 from Data import *
 from visualizations.GameViz import *
+from typing import Dict, Any, List, Union
 
+import json
+import cv2
 import os
 import shutil
 import py7zr
-from typing import Dict, Any, List, Union
+import numpy as np
+import tensorflow as tf
 
 FRAME_WIDTH_OUT = 1280
 FRAME_HEIGHT_OUT = 720
 FPS_OUT = 25
-
-NO_MATCH = -1
 
 
 class Game:
@@ -27,35 +31,47 @@ class Game:
 
     def process(self):
         # 1. Move + create new folder
-        # print(f"Creating game folder for game: {self.title}")
+        print(f"Creating game folder for game: {self.title}")
         # self.createNewGameFolder()
 
         # 2. Normalize
-        # print(f"Normalizing video for game: {self.title}")
+        print(f"Normalizing video for game: {self.title}")
         # self.video.normalize()
 
         # 3. Extract Time
-        #  print(f"Extracting timestamps for game: {self.title}")
+        print(f"Extracting timestamps for game: {self.title}")
         # self.extract_time()
 
         # 4. Post Process Extraction
-        # print(f"Post-processing results for game: {self.title}.")
+        print(f"Post-processing results for game: {self.title}.")
         # self.data.post_process()
 
         # 5. Visualize data-mapping. (For Now)
-        # print("Generating visualization.")
+        print("Generating visualization.")
         # self.visualize_timestamp_extraction()
 
         # 6. Map Timestamps to Statvu File
-        print("Mapping timestamps to statvu data.")
-        self.map_timestamps_to_statvu()
-        out_path: str = f"{self.path_to_game_dir}/mapped.json"
-        os.remove(self.data.path_to_timestamps)
-        os.remove(self.data.path_to_processed_data_unzipped)
-        os.rename(out_path, self.data.path_to_processed_data_unzipped)
+        # print("Mapping timestamps to statvu data.")
+
+        # TODO: test this refactor.
+        # map_timestamps_to_statvu(game=self)
+        # out_path: str = f"{self.path_to_game_dir}/mapped.json"
+        # os.remove(self.data.path_to_timestamps)
+        # os.remove(self.data.path_to_processed_data_unzipped)
+        # os.rename(out_path, self.data.path_to_processed_data_unzipped)
 
         # 7. Visualize Results
         print("All processing complete.")
+
+        # TODO: Spatial Grounding
+        # 1. Find court edges + common features in video
+        # 2. Identify player bounding boxes using YOLO
+        detect_objects(game=self)
+
+        # 3. Overlay 2D points using homography
+        # 4. Mask out people/players outside court
+        # 5. Match points to bounding boxes, generate data
+        # 6. Add to statvu data + viz
         return True
 
     def createNewGameFolder(self) -> bool:
@@ -96,7 +112,7 @@ class Game:
 
     def extract_time(self) -> bool:
         video_path = self.video.path_to_processed_video
-        timestamps = extract_timestamps(
+        timestamps = extract_timestamps_plus_trim(
             video_path=video_path, network=self.network)
         with open(f"{self.path_to_game_dir}/timestamps.json", 'w') as f:
             json.dump(timestamps, f)
@@ -110,7 +126,7 @@ class Game:
                 game_title=self.title)
             game.visualize_event(event_index=event_index)
         except:
-           print(f"Unable to generate visualization for event {event_index}.")
+            print(f"Unable to generate visualization for event {event_index}.")
 
     def visualize_timestamp_extraction(self):
 
@@ -170,49 +186,3 @@ class Game:
         out.release()
         sys.stdout.write('\n')
         print("Video processing complete!")
-
-    def map_timestamps_to_statvu(self) -> bool:
-        """Maps a frame parameter to every moment in orginal stavu data file."""
-
-        timestamps = {}
-        timestamp_data_raw = json.load(open(self.data.path_to_timestamps))
-        for frame in timestamp_data_raw:
-            temp_quarter = str(timestamp_data_raw[frame][0])
-            temp_time_remaining = str(timestamp_data_raw[frame][1])
-            key = f"{temp_quarter} {temp_time_remaining}"
-            timestamps[key] = frame
-
-        statvu_data: Dict[str, Any] = json.load(
-            open(self.data.path_to_processed_data_unzipped))
-        statvu_data["video_path"] = self.data.path_to_processed_data_unzipped.strip(
-            '.json') + '.mp4'
-
-        total, misses = 0, 0
-        for event in statvu_data['events']:
-            for moment in event['moments']:
-                if total == 0:
-                    print(moment)
-
-                quarter: str = str(moment[0])
-                time: int = moment[2]
-
-                found = False
-                for offset in range(-3, 3):
-                    key = f"{quarter} {str(time + (offset / 100))}"
-                    if key in timestamps:
-                        moment.append(timestamps[key])
-                        found = True
-                        break
-                if not found:
-                    moment.append(NO_MATCH)  # no match
-                    misses += 1
-                total += 1
-
-                # Timestamp gets append to end of moment arr, not always going to be in a reliable pos.
-                # Maybe stavu data should use more dicts to solve this problem
-
-        print(f"found frames for {(total - misses)/ total}% of moments")
-        out_path: str = f"{self.path_to_game_dir}/mapped.json"
-        with open(out_path, 'w') as f:
-            json.dump(statvu_data, f)
-        return True

@@ -1,6 +1,9 @@
 import sys
 import json
 from typing import Dict, Any, List, Union
+import Game
+
+NO_MATCH = -1
 
 
 def print_progress(progress: float) -> None:
@@ -10,49 +13,48 @@ def print_progress(progress: float) -> None:
     sys.stdout.flush()
 
 
-def map_timestamps_to_statvu(timestamps_path: str, statvu_path: str) -> None:
-    timestamp_data_path: str = timestamps_path
-    timestamp_data_raw = open(timestamp_data_path)
-    statvu_data_path: str = statvu_path
-    statvu_data_raw = open(statvu_data_path)
+def map_timestamps_to_statvu(game: Game) -> bool:
+    """Maps a frame parameter to every moment in orginal stavu data file."""
 
-    # load the data
-    statvu_data: Dict[str, Any] = json.load(statvu_data_raw)
-    timestamp_data: Dict[str, Union[int, List[Union[int, float]]]] = json.load(
-        timestamp_data_raw)
+    timestamps = {}
+    timestamp_data_raw = json.load(open(game.data.path_to_timestamps))
+    for frame in timestamp_data_raw:
+        temp_quarter = str(timestamp_data_raw[frame][0])
+        temp_time_remaining = str(timestamp_data_raw[frame][1])
+        key = f"{temp_quarter} {temp_time_remaining}"
+        timestamps[key] = frame
 
-    statvu_data["video_path"] = statvu_data_path.strip('.json') + '.mp4'
+    statvu_data: Dict[str, Any] = json.load(
+        open(game.data.path_to_processed_data_unzipped))
+    statvu_data["video_path"] = game.data.path_to_processed_data_unzipped.strip(
+        '.json') + '.mp4'
 
+    total, misses = 0, 0
     for event in statvu_data['events']:
         for moment in event['moments']:
+            if total == 0:
+                print(moment)
+
             quarter: str = str(moment[0])
             time: int = moment[2]
 
-            key_exact: str = quarter + " " + str(time)
-            key_one = quarter + " " + str(time - .01)
-            key_two = quarter + " " + str(time - .02)
-            key_three = quarter + " " + str(time - .03)
-            key_four = quarter + " " + str(time + .01)
-            key_five = quarter + " " + str(time + .02)
-            key_six = quarter + " " + str(time + .03)
+            found = False
+            for offset in range(-3, 3):
+                key = f"{quarter} {str(time + (offset / 100))}"
+                if key in timestamps:
+                    moment.append(timestamps[key])
+                    found = True
+                    break
+            if not found:
+                moment.append(NO_MATCH)  # no match
+                misses += 1
+            total += 1
 
-            if key_exact in timestamp_data:
-                moment.append(timestamp_data[key_exact])
-            elif key_one in timestamp_data:
-                moment.append(timestamp_data[key_one])
-            elif key_two in timestamp_data:
-                moment.append(timestamp_data[key_two])
-            elif key_three in timestamp_data:
-                moment.append(timestamp_data[key_three])
-            elif key_four in timestamp_data:
-                moment.append(timestamp_data[key_four])
-            elif key_five in timestamp_data:
-                moment.append(timestamp_data[key_five])
-            elif key_six in timestamp_data:
-                moment.append(timestamp_data[key_six])
-            else:
-                moment.append(-1)
+            # Timestamp gets append to end of moment arr, not always going to be in a reliable pos.
+            # Maybe stavu data should use more dicts to solve this problem
 
-    out_path: str = statvu_data_path.strip('.json') + "_plus.json"
+    print(f"found frames for {(total - misses)/ total}% of moments")
+    out_path: str = f"{game.path_to_game_dir}/mapped.json"
     with open(out_path, 'w') as f:
         json.dump(statvu_data, f)
+    return True
